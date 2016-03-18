@@ -149,13 +149,24 @@ module PostgreSQLCursor
       fields.each_with_index do |fname, i|
         ftype = @result.ftype i
         fmod  = @result.fmod i
-        types[fname] = @connection.get_type_map.fetch(ftype, fmod) { |oid, mod|
+        types[fname] = get_type_map(@connection).fetch(ftype, fmod) { |oid, mod|
           warn "unknown OID: #{fname}(#{oid}) (#{sql})"
           OID::Identity.new
         }
       end
 
       @column_types = types
+    end
+
+    def get_type_map(connection)
+      if ::ActiveRecord::VERSION::MAJOR == 4 && ::ActiveRecord::VERSION::MINOR == 0
+        # 4.0
+        ::ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::OID::TYPE_MAP
+      else
+        # 4.1~
+        # Returns the private "type_map" needed for the cursor operation
+        connection.__send__(:type_map)
+      end
     end
 
     # Public: Opens (actually, "declares") the cursor. Call this before fetching
